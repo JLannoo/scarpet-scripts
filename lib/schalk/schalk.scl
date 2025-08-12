@@ -1,0 +1,177 @@
+// A port to Scarpet of (schalk)[https://www.npmjs.com/package/schalk]
+// Usage examples:
+//   import('schalk');
+//   print(schalk('red bold', 'Hello world!'));
+//   print(schalk_rgb(123,45,67, 'RGB underlined'));
+//   print(schalk_url('blue underline', 'Click me', 'https://example.com'));
+//   // Compose multiple styled segments:
+//   parts = [
+//     schalk_component('yellow', 'CPU:'),
+//     schalk_component('greenBright bold', '40%'),
+//     ' ',
+//     schalk_component('cyan', '(ok)')
+//   ];
+//   print(schalk_join(parts));
+
+// Version
+_version() -> '0.1.0';
+
+// --- small string helpers (avoid relying on non-standard builtins) ---
+_starts_with(s, p) -> slice(str(s), 0, length(str(p))) == str(p);
+_ends_with(s, p) -> slice(str(s), -length(str(p))) == str(p);
+_strip_sep(s) -> (
+  // remove '-' and '_' from the string
+  join('', split('_', join('', split('-', str(s)))))
+);
+
+// Internal: map style tokens to Scarpet one-letter format codes
+global_style_codes = {
+  // modifiers
+  'bold' -> 'b',
+  'italic' -> 'i',
+  'underline' -> 'u',
+  'strikethrough' -> 's',
+  'strike' -> 's',
+  'obfuscated' -> 'o',
+  'hidden' -> 'o',
+
+  // base colors (Minecraft chat colors)
+  'black' -> 'k',
+  'red' -> 'n',            // dark red as default "red"
+  'redbright' -> 'r',
+  'green' -> 'e',          // dark green
+  'greenbright' -> 'l',    // lime
+  'yellow' -> 'd',         // gold-ish
+  'yellowbright' -> 'y',
+  'blue' -> 'v',           // dark blue
+  'bluebright' -> 't',     // light blue
+  'magenta' -> 'p',        // dark purple
+  'magentabright' -> 'm',  // light purple
+  'cyan' -> 'q',           // dark aqua (turquoise)
+  'cyanbright' -> 'c',     // aqua
+  'white' -> 'w',
+  'whitebright' -> 'w',
+  'gray' -> 'g',
+  'grey' -> 'g',
+  'blackbright' -> 'g',    // alias in schalk
+  'darkgray' -> 'f',
+
+  // extra common aliases
+  'lightblue' -> 't',
+  'lightbluebright' -> 't',
+  'lightgreen' -> 'l',
+  'purple' -> 'p',
+  'lightpurple' -> 'm',
+  'aqua' -> 'c',
+  'darkaqua' -> 'q',
+  'darkred' -> 'n',
+  'darkblue' -> 'v',
+  'darkgreen' -> 'e',
+  'gold' -> 'd'
+};
+
+// Normalize a single style token into a code or a hex color
+// Accepts tokens like 'bold', 'red', 'redBright', 'blue_bright', 'blue-bright', '#FFAACC'
+_normalize_token(tok) -> (
+    if(tok == null, return(null));
+    t = lower(str(tok));
+    t = _strip_sep(t);
+
+    if(_starts_with(t, '#'), return(upper(t)));
+    if(_ends_with(t, 'bright'),
+        base = slice(t, 0, -6);
+        code = global_style_codes:(base+'bright');
+        if(code, return(code));
+    );
+
+    return(global_style_codes:t);
+);
+
+// Build a format string (e.g., 'bu#FF00AA') from a style descriptor
+// styles can be: string 'red bold', list of tokens, or null
+_format_string(styles) -> (
+  if(styles == null, return(''));
+  tokens = if(type(styles) == 'list', styles, split(' ', str(styles)));
+  fmt = '';
+  seen = {};
+  last_hex = null;
+  for(tokens,
+    tok = _normalize_token(_);
+    if(tok == null, continue());
+    if(_starts_with(tok, '#'), last_hex = tok; continue());
+    // avoid duplicates for one-letter codes
+    if(seen~tok == null, put(seen, tok, true); fmt += tok);
+  );
+  if(last_hex, fmt += last_hex);
+
+  return(fmt);
+);
+
+// Make a single component string for format()
+schalk_component(styles, text) -> (
+  fmt = _format_string(styles);
+  return(str('%s %s', fmt, str(text)));
+);
+
+// Core: apply styles to a single text segment -> FormattedText
+schalk(styles, text) -> format(schalk_component(styles, text));
+
+// Color helpers (single segment)
+schalk_rgb(r, g, b, text) -> (
+  r = max(0, min(255, floor(r)));
+  g = max(0, min(255, floor(g)));
+  b = max(0, min(255, floor(b)));
+  hex = str('#%02X%02X%02X', r, g, b);
+  format(schalk_component(hex, text));
+);
+
+schalk_hex(hex, text) -> (
+  h = str(hex);
+  if(!_starts_with(h, '#'), h = '#'+h);
+  h = upper(h);
+  if(length(h) != 7, return(str(text))); // fallback
+  format(schalk_component(h, text));
+);
+
+// Join multiple components and strings into one formatted line
+// parts: list containing component strings (from schalk_component), decorators, or plain strings
+schalk_join(parts) -> format(parts);
+
+// Composable decorator components — produce raw decorator parts for format()
+// Use with schalk_component + schalk_join to build rich messages with multiple decorators.
+schalk_hover(hover_styles, hover_text) -> (
+  tipFmt = _format_string(hover_styles);
+  return(str('^%s %s', tipFmt, str(hover_text)));
+);
+schalk_url(url) -> '@'+str(url);
+schalk_command(command) -> '!'+str(command);
+schalk_suggest(suggestion) -> '?'+str(suggestion);
+schalk_copy(copyText) -> '&'+str(copyText);
+
+// Convenience single-style wrappers (common colors/modifiers)
+schalk_bold(text) -> format(schalk_component('bold', text));
+schalk_italic(text) -> format(schalk_component('italic', text));
+schalk_underline(text) -> format(schalk_component('underline', text));
+schalk_strikethrough(text) -> format(schalk_component('strikethrough', text));
+schalk_obfuscated(text) -> format(schalk_component('obfuscated', text));
+
+schalk_black(text) -> format(schalk_component('black', text));
+schalk_red(text) -> format(schalk_component('red', text));
+schalk_green(text) -> format(schalk_component('green', text));
+schalk_yellow(text) -> format(schalk_component('yellow', text));
+schalk_blue(text) -> format(schalk_component('blue', text));
+schalk_magenta(text) -> format(schalk_component('magenta', text));
+schalk_cyan(text) -> format(schalk_component('cyan', text));
+schalk_white(text) -> format(schalk_component('white', text));
+schalk_gray(text) -> format(schalk_component('gray', text));
+
+schalk_red_bright(text) -> format(schalk_component('redBright', text));
+schalk_green_bright(text) -> format(schalk_component('greenBright', text));
+schalk_yellow_bright(text) -> format(schalk_component('yellowBright', text));
+schalk_blue_bright(text) -> format(schalk_component('blueBright', text));
+schalk_magenta_bright(text) -> format(schalk_component('magentaBright', text));
+schalk_cyan_bright(text) -> format(schalk_component('cyanBright', text));
+schalk_white_bright(text) -> format(schalk_component('whiteBright', text));
+schalk_black_bright(text) -> format(schalk_component('blackBright', text));
+
+// Note: Background colors are not supported in Minecraft chat, so bg* styles are omitted.

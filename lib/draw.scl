@@ -1,0 +1,45 @@
+draw_line_from_entity_to_blocks(entity, blocks, ticks, block_config, line_config, offset) -> (
+    default_block_config = {
+        'color' -> 0xffffffff,
+        'fill' -> true,
+    };
+
+    default_line_config = {
+        'color' -> 0xffffffff,
+    };
+
+    // Type cheks and validations
+    if(type(entity) != 'entity', throw('Entity must be of type entity'));
+    if(blocks == null, throw('Blocks cannot be null'));
+
+    if(type(blocks) != 'list', blocks = [blocks]);
+    if(length(blocks) == 0, throw('Blocks list cannot be empty'));
+
+    if(entity == null || blocks == null || length(blocks) == 0,
+        throw('Entity or blocks are null/empty');
+    );
+
+    entity_pos = pos(entity);
+
+    if(block_config == null, block_config = default_block_config);
+    if(line_config == null, line_config = default_line_config);
+
+    b_from_offset = if(offset:'block':'from' != null, offset:'block':'from', [0, 0, 0]);
+    b_to_offset = if(offset:'block':'to' != null, offset:'block':'to', [0, 0, 0]);
+
+    l_from_offset = if(offset:'line':'from' != null, offset:'line':'from', [0, 0, 0]);
+    l_to_offset = if(offset:'line':'to' != null, offset:'line':'to', [0, 0, 0]);
+
+    for(blocks,
+        block = _;
+        block_pos = pos(block);
+
+        block_config:'from' = block_pos + b_from_offset;
+        block_config:'to' = block_pos + [1, 1, 1] + b_to_offset;
+        draw_shape('box', ticks, block_config);
+
+        line_config:'from' = entity_pos + l_from_offset;
+        line_config:'to' = block_pos + l_to_offset;
+        draw_shape('line', ticks, line_config);
+    );
+);
