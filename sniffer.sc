@@ -37,8 +37,7 @@ toggle() -> (
 
 __draw_overlay() -> (    
     sniffers = entity_list('sniffer');
-    if(length(sniffers) == 0, 
-        print('No sniffers found.');
+    if(length(sniffers) == 0,
         return()
     );
 
